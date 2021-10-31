@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "py-nest-thermostat"
+version = "0.0.0"
+description = "A Python CLI Nest Thermostat controller and dashborading tool"
+authors = ["Bastien Boutonnet <bastien.b1@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+httpx = "^0.20.0"
+python-dotenv = "^0.19.1"
+
+[tool.poetry.dev-dependencies]
+pre-commit = "^2.15.0"
+black = "^21.9b0"
+pytest = "^6.2.5"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
