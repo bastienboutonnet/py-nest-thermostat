@@ -21,6 +21,7 @@ class Authenticator:
         self.client_id: str = os.getenv("client_id", "")
         self.client_secret: str = os.getenv("client_secret", "")
         self.redirect_uri: str = os.getenv("redirect_uri", "")
+        self.project_id: str = os.getenv("project_id", "")
         self.authorization_code: str = os.getenv("authorization_code", "")
         self.refresh_token: Optional[str] = os.getenv("refresh_token")
 
@@ -66,7 +67,8 @@ class Authenticator:
                 token_response = httpx.post(self.TOKEN_URL, params=refresh_token_params)
                 if token_response.status_code == 200:
                     self.token_response_json = token_response.json()
-                    self.access_token = self.token_response_json.get("access_token", "")
+                    if self.token_response_json:
+                        self.access_token = self.token_response_json.get("access_token", "")
                 else:
                     raise AuthRequestError(
                         f"{token_response.status_code=}, {token_response.json()=}"
@@ -74,30 +76,48 @@ class Authenticator:
             except httpx.RequestError as e:
                 print(f"There was an issue while requesting {e.request.url!r}.")
         else:
-            # when we do not have a refresh token
-            print("we're going to try first time auth flow")
-            token_request_params: Dict[str, str] = {
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
-                "authorization_code": self.authorization_code,
-                "grant_type": "authorization_code",
-                "redirect_uri": self.redirect_uri,
-            }
-            token_response = httpx.post(self.TOKEN_URL, params=token_request_params)
-            if token_response.status_code == 200:
-                self.token_response_json = token_response.json()
-                self.access_token = self.token_response_json.get("access_token", "")
+            # we first need to obtain an authorization_code via an interactive process
+            authorization_code_url = (
+                f"https://nestservices.google.com/partnerconnections/"
+                f"{self.project_id}/auth?redirect_uri={self.redirect_uri}&access_type=offline&prompt=consent&client_id="
+                f"{self.client_id}&response_type=code&scope=https://www.googleapis.com/auth/sdm.service"
+            )
+            print(
+                f"Open the following URL in your browser: {authorization_code_url} \n"
+                f"Once you have authorised, you will be redirected to your redirect_uri: {self.redirect_uri}"
+            )
+            auth_code = input(
+                "Paste the code contained between '?code=' and '&scope=' "
+                "from the URL of the page that was loaded after you authorised the app."
+            )
+            # REGEG: \?code=(.*)&scope
+            if auth_code is not None:
+                # we then use that code to make an auth and this will give us a token + a refresh one
 
-                if self.access_token:
-                    self.access_token_obtained_at = datetime.now()
-                self.refresh_token = self.token_response_json.get("refresh_token", "")
+                # when we do not have a refresh token
+                print("we're going to try first time auth flow")
+                token_request_params: Dict[str, str] = {
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                    "authorization_code": auth_code,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": self.redirect_uri,
+                }
+                token_response = httpx.post(self.TOKEN_URL, params=token_request_params)
+                if token_response.status_code == 200:
+                    self.token_response_json = token_response.json()
+                    self.access_token = self.token_response_json.get("access_token", "")
 
-                if self.refresh_token is not None:
-                    with open("credentials.env", "a") as f:
-                        # TODO: this is a bit dirty may we should rewrite so that
-                        # we check wether there is already an entry for "refresh_token" in the file
-                        # and in that case we probably want to nuke it first.
-                        f.write(f"refresh_token={self.refresh_token}")
+                    if self.access_token:
+                        self.access_token_obtained_at = datetime.now()
+                    self.refresh_token = self.token_response_json.get("refresh_token", "")
+
+                    if self.refresh_token is not None:
+                        with open("credentials.env", "a") as f:
+                            # TODO: this is a bit dirty may we should rewrite so that
+                            # we check wether there is already an entry for "refresh_token" in the file
+                            # and in that case we probably want to nuke it first.
+                            f.write(f"refresh_token={self.refresh_token}")
             else:
                 raise AuthRequestError("meh")
 
