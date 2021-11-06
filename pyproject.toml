@@ -6,7 +6,7 @@ authors = ["Bastien Boutonnet <bastien.b1@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 httpx = "^0.20.0"
 python-dotenv = "^0.19.1"
 

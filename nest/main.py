@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import httpx
 from dotenv import load_dotenv
@@ -26,15 +26,15 @@ class Authenticator:
         self.refresh_token: Optional[str] = os.getenv("refresh_token")
 
         # this will be populated when we do get token
-        self.access_token_json: Optional[Dict[str, Any]] = None
+        self.access_token_json: Optional[dict[str, Any]] = None
         self.access_token: str
         self.access_token_obtained_at: datetime
-        self.token_response_json: Optional[Dict[str, Any]] = None
+        self.token_response_json: Optional[dict[str, Any]] = None
 
     def get_token(self):
         # open the cached creds
         if os.path.isfile(self.ACCESS_TOKEN_FILENAME):
-            with open(self.ACCESS_TOKEN_FILENAME, "r") as f:
+            with open(self.ACCESS_TOKEN_FILENAME) as f:
                 self.access_token_json = json.load(f)
 
         if self.access_token_json is not None:
@@ -58,7 +58,7 @@ class Authenticator:
     def authenticate(self):
         # if we already have a refresh token we don't need to go through auth again.
         if self.refresh_token:
-            refresh_token_params: Dict[str, str] = {
+            refresh_token_params: dict[str, str] = {
                 "client_id": self.client_id,
                 "client_secret": self.client_secret,
                 "refresh_token": self.refresh_token,
@@ -96,7 +96,7 @@ class Authenticator:
 
                 # when we do not have a refresh token
                 print("we're going to try first time auth flow")
-                token_request_params: Dict[str, str] = {
+                token_request_params: dict[str, str] = {
                     "client_id": self.client_id,
                     "client_secret": self.client_secret,
                     "authorization_code": auth_code,
