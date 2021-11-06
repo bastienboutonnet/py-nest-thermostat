@@ -131,3 +131,4 @@ dmypy.json
 # env files
 *.env
 *.vim
+access_token.json
