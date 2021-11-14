@@ -17,8 +17,8 @@ repos:
     hooks:
       - id: mypy
         name: Lint nest with mypy
-        files: ^nest/
-        entry: mypy nest/
+        files: ^py_nest_thermostat/
+        entry: mypy py_nest_thermostat/
         pass_filenames: false
         args: ["--ignore-missing-imports"]
         additional_dependencies:
