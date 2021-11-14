@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import httpx
+import questionary
 from dotenv import load_dotenv
 from rich.console import Console
 
@@ -61,11 +62,9 @@ class Authenticator:
             if last_access_to_now_delta.seconds > int(expires_delta) - 10:
                 log.debug("We need to refresh the token as it has expired.")
                 self.authenticate()
-                # return self.access_token
             else:
                 log.debug("No need to authenticate, auth code is still valid")
                 self.access_token = self.access_token_json.get("access_token", "")
-                # return self.access_tokenf
         else:
             log.info("Authenticating")
             self.authenticate()
@@ -104,10 +103,12 @@ class Authenticator:
                 f"Once you have authorised, you will be redirected to your redirect_uri: {self.redirect_uri}"
             )
             # TODO: Revisit this as it looks like passing the 4/ via the input changes the / and messes up the request.
-            auth_code = input(
-                "Paste the code contained between '?code=' and '&scope=' "
-                "from the URL of the page that was loaded after you authorised the app."
-            )
+            auth_code = questionary.password(
+                message=(
+                    "Paste the code contained between '?code=' and '&scope=' "
+                    "from the URL of the page that was loaded after you authorised the app."
+                )
+            ).ask()
             if auth_code is not None:
                 # we then use that code to make an auth and this will give us a token + a refresh one
                 log.debug("we're going to try first time auth flow")
@@ -133,8 +134,12 @@ class Authenticator:
                             # we check wether there is already an entry for "refresh_token" in the file
                             # and in that case we probably want to nuke it first.
                             f.write(f"refresh_token={self.refresh_token}")
+                else:
+                    raise AuthRequestError(
+                        f"Token request unsuccessful {token_response.status_code=}, {token_response.text=}"
+                    )
             else:
-                raise AuthRequestError("meh")
+                raise AuthRequestError("You do not seem to have provided any authorization_code")
 
                 # cache the access code along with a timestamp of when we got it
         if self.token_response_json:

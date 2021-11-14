@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 
 import httpx
 from pydantic import BaseModel
@@ -56,10 +56,10 @@ class NestThermostat:
         self.authenticator = authenticator
 
         # made available by methods
-        self.device_list: DeviceList
-        self.device_type: str
-        self.thermostat_id: str
-        self.thermostat_display_name: str
+        self.device_list: Optional[DeviceList]
+        self.device_type: Optional[str]
+        self.thermostat_id: Optional[str]
+        self.thermostat_display_name: Optional[str]
 
         self.authenticator.get_token()
         self.headers = {
@@ -78,9 +78,9 @@ class NestThermostat:
             # TODO: we need to allow users to choose their device as there may be more than one
             self.device_type = self.device_list.devices[0].type
             if {self.device_type}.issubset(self.SUPPORTED_DEVICE_TYPES):
-                self.thermostat_id = re.search(r"(?<=\/devices\/).*", self.device_list[0].name)
-                if self.thermostat_id:
-                    self.thermostat_id = self.thermostat_id[0]
+                device_id_match = re.search(r"(?<=\/devices\/).*", self.device_list.devices[0].name)
+                if device_id_match:
+                    self.thermostat_id = device_id_match[0]
                 self.thermostat_display_name = (
                     self.device_list.devices[0].parentRelations[0].displayName
                 )
@@ -99,7 +99,8 @@ class NestThermostat:
     def get_device_stats(self, print: bool = True):
         # TODO: think about replacing the key access by gets when there is a chance that the attribute it not present.
         self.get_devices()
-        self.active_device: Device = self.device_list.devices[0]
+        assert self.device_list, "device_list cannot be None"
+        self.active_device: Optional[Device] = self.device_list.devices[0]
 
         # we need to get the unit because it will help us use approproate scale specific keys
         temperature_unit = self.active_device.traits["sdm.devices.traits.Settings"][
@@ -178,10 +179,7 @@ class NestThermostat:
     def set_target_temperature(self, temperature: float):
         self.get_device_stats(print=False)
 
-        # TODO: make this parsing be a regex that parses from this pattern:
-        # "name": "enterprises/project-id/devices/device-id",
-        device_id = self.thermostat_id.split("/")[-1]
-        command_url = f"{self.SDM_API}/enterprises/{self.authenticator.project_id}/devices/{device_id}:executeCommand"
+        command_url = f"{self.SDM_API}/enterprises/{self.authenticator.project_id}/devices/{self.thermostat_id}:executeCommand"  # noqa: E501
 
         temperature = float(temperature)
         request_body = {
