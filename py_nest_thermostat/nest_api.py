@@ -1,10 +1,18 @@
-from typing import Any, Optional
+import json
+import re
+from typing import Any, Sequence
 
 import httpx
-import questionary
 from pydantic import BaseModel
+from rich.align import Align
+from rich.columns import Columns
+from rich.console import Console
+from rich.panel import Panel
 
 from py_nest_thermostat.auth import Authenticator
+from py_nest_thermostat.logger import log
+
+console = Console()
 
 
 class ParentRelation(BaseModel):
@@ -14,6 +22,8 @@ class ParentRelation(BaseModel):
 
 # TODO: Is there a way I could do a model also for the thermostat traits?
 # I should but the traits name have dots so we'll have to find a way to set up aliases or something like that.
+# this doc page contains a JSON (https://developers.google.com/nest/device-access/api/thermostat#json)
+# which I could probably make pydantic parse and build a model for.
 class Device(BaseModel):
     name: str
     type: str
@@ -23,61 +33,168 @@ class Device(BaseModel):
 
 
 class DeviceList(BaseModel):
-    devices: list[Device]
+    devices: Sequence[Device]
+
+
+class ThermostatStats(BaseModel):
+    device_name: str
+    status: str
+    humidity: float
+    temperature: float
+    temperature_unit: str
+    mode: str
+    target_temperature: str
 
 
 class NestThermostat:
     BASE_NEST_API_URL: str = "https://smartdevicemanagement.googleapis.com/v1/enterprises/"
+    NEST_SET_URL: str = "https://smartdevicemanagement.googleapis.com/v1/"
     SUPPORTED_DEVICE_TYPES: set[str] = {"sdm.devices.types.THERMOSTAT"}
+    SDM_API: str = "https://smartdevicemanagement.googleapis.com/v1"
 
     def __init__(self, authenticator: Authenticator):
         self.authenticator = authenticator
 
         # made available by methods
-        self.devices: dict[str, Any]
+        self.device_list: DeviceList
         self.device_type: str
         self.thermostat_id: str
         self.thermostat_display_name: str
 
-    def get_devices(self):
         self.authenticator.get_token()
-        device_url = f"{self.BASE_NEST_API_URL}{self.authenticator.project_id}/devices"
-        headers = {
+        self.headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.authenticator.access_token}",
         }
 
-        devices_response = httpx.get(device_url, headers=headers)
+    def get_devices(self):
+        device_url = f"{self.BASE_NEST_API_URL}{self.authenticator.project_id}/devices"
+
+        devices_response = httpx.get(device_url, headers=self.headers)
 
         if devices_response.status_code == 200:
-            devices = devices_response.json()
-            print(devices)
+            self.device_list = DeviceList(**devices_response.json())
 
-            # if there are several devices in the home we need to ask users to choose
-            if len(devices.get("devices")) > 1:
-                available_devices = devices.get("devices")
-                chosen_device = questionary.select(
-                    "You seem to have seveal devices in your home. Which is the Nest thermostat you want to control?",
-                    choices=available_devices,
-                ).ask()
-                print(chosen_device)
+            # TODO: we need to allow users to choose their device as there may be more than one
+            self.device_type = self.device_list.devices[0].type
+            if {self.device_type}.issubset(self.SUPPORTED_DEVICE_TYPES):
+                self.thermostat_id = re.search(r"(?<=\/devices\/).*", self.device_list[0].name)
+                if self.thermostat_id:
+                    self.thermostat_id = self.thermostat_id[0]
+                self.thermostat_display_name = (
+                    self.device_list.devices[0].parentRelations[0].displayName
+                )
+                console.print(
+                    f"You're currently controlling the '{self.thermostat_display_name}' thermostat."
+                )
             else:
-                self.device_type = devices.get("devices")[0]["type"]
-                if {self.device_type}.issubset(self.SUPPORTED_DEVICE_TYPES):
-                    self.thermostat_id = devices.get("devices")[0].get("name")
-                    self.thermostat_display_name = devices.get("devices")[0]["parentRelations"][0][
-                        "displayName"
-                    ]
-                    # .get("name")
-                    print(f"{self.thermostat_display_name=}")
-                else:
-                    print(
-                        f"Unsupported Device Type: {self.device_type}. Supported types: {self.SUPPORTED_DEVICE_TYPES}"
-                    )
+                log.error(
+                    f"Unsupported Device Type: {self.device_type}. Supported types: {self.SUPPORTED_DEVICE_TYPES}"
+                )
         else:
             raise httpx.RequestError(
                 f"Request failed: {devices_response.status_code=}, {devices_response.text=}"
             )
 
-    def get_device_stats(self, device_name: Optional[str] = None):
+    def get_device_stats(self, print: bool = True):
+        # TODO: think about replacing the key access by gets when there is a chance that the attribute it not present.
         self.get_devices()
+        self.active_device: Device = self.device_list.devices[0]
+
+        # we need to get the unit because it will help us use approproate scale specific keys
+        temperature_unit = self.active_device.traits["sdm.devices.traits.Settings"][
+            "temperatureScale"
+        ]
+        temperature_unit = temperature_unit.title()
+        self.device_stats = ThermostatStats(
+            device_id=self.active_device.name,
+            device_name=self.active_device.parentRelations[0].displayName,
+            status=self.active_device.traits["sdm.devices.traits.Connectivity"]["status"],
+            humidity=round(
+                float(
+                    self.active_device.traits["sdm.devices.traits.Humidity"][
+                        "ambientHumidityPercent"
+                    ],
+                ),
+            ),
+            temperature=round(
+                self.active_device.traits["sdm.devices.traits.Temperature"][
+                    f"ambientTemperature{temperature_unit}"
+                ],
+                1,
+            ),
+            temperature_unit=temperature_unit,
+            mode=self.active_device.traits["sdm.devices.traits.ThermostatMode"]["mode"],
+            target_temperature=round(
+                self.active_device.traits["sdm.devices.traits.ThermostatTemperatureSetpoint"][
+                    f"heat{temperature_unit}"
+                ],
+                1,
+            ),
+        )
+        if print:
+            teal = "#A8F9FF"
+            red = "#FF6978"
+            temp_colour = (
+                teal
+                if float(self.device_stats.temperature)
+                < float(self.device_stats.target_temperature)
+                else teal
+            )
+            target_temp_colour = (
+                red
+                if float(self.device_stats.target_temperature)
+                > float(self.device_stats.temperature)
+                else teal
+            )
+            mode_colour = red if self.device_stats.mode == "HEAT" else teal
+            temp_symbol = "°C" if self.device_stats.temperature_unit.lower() == "celsius" else "°F"
+            panels = [
+                Panel(
+                    Align.center(
+                        f"[bold][{temp_colour}]{self.device_stats.temperature}[/{temp_colour}][/bold] {temp_symbol}"
+                    ),
+                    title="Temperature",
+                ),
+                Panel(
+                    Align.center(f"[bold][{teal}]{self.device_stats.humidity}[/{teal}][/bold] %"),
+                    title="Humidity",
+                ),
+                Panel(
+                    Align.center(
+                        f"[bold][{mode_colour}]{self.device_stats.mode}[/{mode_colour}][/bold]"
+                    ),
+                    title="Mode",
+                ),
+                Panel(
+                    Align.center(
+                        f"[bold][{target_temp_colour}]{float(self.device_stats.target_temperature)}[/{target_temp_colour}][/bold] {temp_symbol}"  # noqa: E501
+                    ),
+                    title="Target Temperature",
+                ),
+            ]
+            console.print(Columns(panels))
+
+    def set_target_temperature(self, temperature: float):
+        self.get_device_stats(print=False)
+
+        # TODO: make this parsing be a regex that parses from this pattern:
+        # "name": "enterprises/project-id/devices/device-id",
+        device_id = self.thermostat_id.split("/")[-1]
+        command_url = f"{self.SDM_API}/enterprises/{self.authenticator.project_id}/devices/{device_id}:executeCommand"
+
+        temperature = float(temperature)
+        request_body = {
+            "command": "sdm.devices.commands.ThermostatTemperatureSetpoint.SetHeat",
+            "params": {"heatCelsius": temperature},
+        }
+        response = httpx.post(
+            command_url,
+            headers=self.headers,
+            data=json.dumps(request_body),  # type: ignore
+        )
+
+        if response.status_code == 200:
+            console.print(f"{self.thermostat_display_name} successfully set to '{temperature}'")
+        else:
+            httpx.RequestError(f"Request failed: {response.status_code=}, {response.text=}")

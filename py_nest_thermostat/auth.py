@@ -6,6 +6,11 @@ from typing import Any, Optional
 
 import httpx
 from dotenv import load_dotenv
+from rich.console import Console
+
+from py_nest_thermostat.logger import log
+
+console = Console()
 
 CREDENTIALS_FILE = Path("~/.py-nest-thermostat/credentials.env").expanduser()
 load_dotenv(CREDENTIALS_FILE)
@@ -18,7 +23,6 @@ class AuthRequestError(Exception):
 class Authenticator:
     TOKEN_URL = "https://www.googleapis.com/oauth2/v4/token"
     ACCESS_TOKEN_FILENAME = Path("~/.py-nest-thermostat/access_token.json").expanduser()
-    print(ACCESS_TOKEN_FILENAME)
 
     def __init__(self):
         self.client_id: str = os.getenv("client_id", "")
@@ -41,31 +45,29 @@ class Authenticator:
                 try:
                     self.access_token_json = json.load(f)
                 except json.JSONDecodeError as e:
-                    print(
+                    log.error(
                         f"There was an issue reading access_token.json so we'll have to re-authenticate. Error: {e}"
                     )
                     self.access_token_json = None
 
         if self.access_token_json is not None:
-            print("we have an access token")
             last_accessed_at = self.access_token_json.get(
                 "access_token_obtained_at", "1901-01-01 00:00:00"
             )
             last_accessed_at = datetime.strptime(last_accessed_at, "%Y-%m-%d %H:%M:%S.%f")
             expires_delta = self.access_token_json.get("expires_in", 0)
             last_access_to_now_delta = datetime.now() - last_accessed_at
-            print(f"{last_access_to_now_delta=}")
 
             if last_access_to_now_delta.seconds > int(expires_delta) - 10:
-                print("We need to refresh the token as it has expired.")
+                log.debug("We need to refresh the token as it has expired.")
                 self.authenticate()
                 # return self.access_token
             else:
-                print("No need to authenticate, auth code is still valid")
+                log.debug("No need to authenticate, auth code is still valid")
                 self.access_token = self.access_token_json.get("access_token", "")
                 # return self.access_tokenf
         else:
-            print("Authenticating")
+            log.info("Authenticating")
             self.authenticate()
 
     def authenticate(self):
@@ -79,7 +81,7 @@ class Authenticator:
             }
             try:
                 token_response = httpx.post(self.TOKEN_URL, params=refresh_token_params)
-                print(f"Made refresh request at {token_response.url}")
+                log.debug("Made refresh for token")
                 if token_response.status_code == 200:
                     self.token_response_json = token_response.json()
                     if self.token_response_json:
@@ -89,7 +91,7 @@ class Authenticator:
                         f"{token_response.status_code=}, {token_response.json()=}"
                     )
             except httpx.RequestError as e:
-                print(f"There was an issue while requesting {e.request.url!r}.")
+                log.error(f"There was an issue while requesting tokens. {e}")
         else:
             # we first need to obtain an authorization_code via an interactive process
             authorization_code_url = (
@@ -97,7 +99,7 @@ class Authenticator:
                 f"{self.project_id}/auth?redirect_uri={self.redirect_uri}&access_type=offline&prompt=consent&client_id="
                 f"{self.client_id}&response_type=code&scope=https://www.googleapis.com/auth/sdm.service"
             )
-            print(
+            console.print(
                 f"Open the following URL in your browser: {authorization_code_url} \n"
                 f"Once you have authorised, you will be redirected to your redirect_uri: {self.redirect_uri}"
             )
@@ -108,7 +110,7 @@ class Authenticator:
             )
             if auth_code is not None:
                 # we then use that code to make an auth and this will give us a token + a refresh one
-                print("we're going to try first time auth flow")
+                log.debug("we're going to try first time auth flow")
                 token_request_params: dict[str, str] = {
                     "client_id": self.client_id,
                     "client_secret": self.client_secret,
@@ -117,7 +119,6 @@ class Authenticator:
                     "redirect_uri": self.redirect_uri,
                 }
                 token_response = httpx.post(self.TOKEN_URL, params=token_request_params)
-                print(token_response.url)
                 if token_response.status_code == 200:
                     self.token_response_json = token_response.json()
                     self.access_token = self.token_response_json.get("access_token", "")
