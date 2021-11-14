@@ -20,7 +20,7 @@ repos:
         files: ^py_nest_thermostat/
         entry: mypy py_nest_thermostat/
         pass_filenames: false
-        args: ["--ignore-missing-imports"]
+        args: ["--ignore-missing-imports", "--python-version=3.9"]
         additional_dependencies:
           - "types-all"
   - repo: https://github.com/PyCQA/isort
