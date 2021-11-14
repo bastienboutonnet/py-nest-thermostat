@@ -8,7 +8,7 @@ current = "0.0.0-a0"
 # Make sure this matches current_version before
 # using tbump
 regex = '''
-  (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)((?P<prerelease>[a-z]+)(?P<build>\d+))?
+  (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)-((?P<prerelease>[a-z]+)(?P<build>\d+))?
   '''
 
 [git]
@@ -20,7 +20,7 @@ tag_template = "v{new_version}"
 # tbump.toml location.
 [[file]]
 src = "README.md"
-search = {current_version}
+search = "{current_version}"
 # You can specify a list of commands to
 # run after the files have been patched
 # and before the git commit is made
