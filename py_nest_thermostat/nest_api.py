@@ -47,8 +47,8 @@ class ThermostatStats(BaseModel):
 
 
 class NestThermostat:
+    # TODO: remove BASE_NEST_API_URL and update downstream query urls
     BASE_NEST_API_URL: str = "https://smartdevicemanagement.googleapis.com/v1/enterprises/"
-    NEST_SET_URL: str = "https://smartdevicemanagement.googleapis.com/v1/"
     SUPPORTED_DEVICE_TYPES: set[str] = {"sdm.devices.types.THERMOSTAT"}
     SDM_API: str = "https://smartdevicemanagement.googleapis.com/v1"
 

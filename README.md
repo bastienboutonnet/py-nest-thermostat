@@ -1,4 +1,4 @@
-v0.0.0-a0
+Version: `v0.0.0-a0`
 
 # py-nest-thermostat
 
@@ -7,12 +7,12 @@ Python CLI Nest Controller and Reporting Tool.
 **Disclaimer:**
 This project is very much work in progress while in version 0 anything can change, anything can break and some parts of the code are probably very ugly. Feel free to test it, contribute (see [CONTRIBUTING.md]()), report bugs
 
-Features:
+## Features:
 
 - print device stats
 - set target temperature
 
-Future Features:
+## Future Features:
 
 - capture device statistics into a database
 - plot device statistics over time
