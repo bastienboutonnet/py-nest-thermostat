@@ -26,11 +26,15 @@ class DevicesStatsCommand(Command):
     Loads the thermostat statistics such as: humidity, temperature, target temp, heating mode etc.
 
     stats
+        {--save-to-db : When passed, the stats will be added to the backend database.}
+        {--no-print : When passed, the stats not be printed.}
     """
 
     def handle(self):
         thermostat = NestThermostat(AUTHENTICATOR)
-        thermostat.get_device_stats()
+        thermostat.get_device_stats(
+            no_print=self.option("no-print"), save_stats=self.option("save-to-db")  # type: ignore
+        )
 
 
 class SetTemperatureCommand(Command):
@@ -38,7 +42,7 @@ class SetTemperatureCommand(Command):
     Sets the target temperature on your device
 
     temp
-        {temperature : (float | int) What temperature do you want your heating at?}
+        {temperature : (float | int) Numeric value to which you want to heat or cool to.}
     """
 
     def handle(self):
