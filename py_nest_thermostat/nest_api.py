@@ -1,5 +1,7 @@
 import json
 import re
+import uuid
+from datetime import datetime
 from typing import Any, Optional, Sequence
 
 import httpx
@@ -10,7 +12,9 @@ from rich.console import Console
 from rich.panel import Panel
 
 from py_nest_thermostat.auth import Authenticator
+from py_nest_thermostat.database import database_connector
 from py_nest_thermostat.logger import log
+from py_nest_thermostat.models import DeviceStats
 
 console = Console()
 
@@ -96,7 +100,7 @@ class NestThermostat:
                 f"Request failed: {devices_response.status_code=}, {devices_response.text=}"
             )
 
-    def get_device_stats(self, print: bool = True):
+    def get_device_stats(self, no_print: bool = False, save_stats: bool = False):
         # TODO: think about replacing the key access by gets when there is a chance that the attribute it not present.
         self.get_devices()
         assert self.device_list, "device_list cannot be None"
@@ -133,51 +137,77 @@ class NestThermostat:
                 1,
             ),
         )
-        if print:
-            teal = "#A8F9FF"
-            red = "#FF6978"
-            temp_colour = (
-                teal
-                if float(self.device_stats.temperature)
-                < float(self.device_stats.target_temperature)
-                else teal
+        if not no_print:
+            self.print_device_stats()
+        if save_stats:
+            self.save_record_to_db()
+
+    def save_record_to_db(self):
+        id = uuid.uuid1()
+        if isinstance(self.device_stats, ThermostatStats):
+            device_stats = DeviceStats(
+                id=id,
+                name=self.thermostat_display_name,
+                recorded_at=datetime.utcnow(),
+                humidity=self.device_stats.humidity,
+                temperature=self.device_stats.temperature,
+                mode=self.device_stats.mode,
+                target_temperature=self.device_stats.target_temperature,
             )
-            target_temp_colour = (
-                red
-                if float(self.device_stats.target_temperature)
-                > float(self.device_stats.temperature)
-                else teal
+            database_connector.connect()
+            database_connector.create_models()
+            with database_connector.session_manager() as session:
+                log.info("Saving thremostat stats to database")
+                session.add(device_stats)
+                session.commit()
+        else:
+            raise AttributeError(
+                "device_stats is None or not a valid object of type ThermostatStats. Skipping database update"
             )
-            mode_colour = red if self.device_stats.mode == "HEAT" else teal
-            temp_symbol = "°C" if self.device_stats.temperature_unit.lower() == "celsius" else "°F"
-            panels = [
-                Panel(
-                    Align.center(
-                        f"[bold][{temp_colour}]{self.device_stats.temperature}[/{temp_colour}][/bold] {temp_symbol}"
-                    ),
-                    title="Temperature",
+
+    def print_device_stats(self):
+        teal = "#A8F9FF"
+        red = "#FF6978"
+        temp_colour = (
+            teal
+            if float(self.device_stats.temperature) < float(self.device_stats.target_temperature)
+            else teal
+        )
+        target_temp_colour = (
+            red
+            if float(self.device_stats.target_temperature) > float(self.device_stats.temperature)
+            else teal
+        )
+        mode_colour = red if self.device_stats.mode == "HEAT" else teal
+        temp_symbol = "°C" if self.device_stats.temperature_unit.lower() == "celsius" else "°F"
+        panels = [
+            Panel(
+                Align.center(
+                    f"[bold][{temp_colour}]{self.device_stats.temperature}[/{temp_colour}][/bold] {temp_symbol}"
                 ),
-                Panel(
-                    Align.center(f"[bold][{teal}]{self.device_stats.humidity}[/{teal}][/bold] %"),
-                    title="Humidity",
+                title="Temperature",
+            ),
+            Panel(
+                Align.center(f"[bold][{teal}]{self.device_stats.humidity}[/{teal}][/bold] %"),
+                title="Humidity",
+            ),
+            Panel(
+                Align.center(
+                    f"[bold][{mode_colour}]{self.device_stats.mode}[/{mode_colour}][/bold]"
                 ),
-                Panel(
-                    Align.center(
-                        f"[bold][{mode_colour}]{self.device_stats.mode}[/{mode_colour}][/bold]"
-                    ),
-                    title="Mode",
+                title="Mode",
+            ),
+            Panel(
+                Align.center(
+                    f"[bold][{target_temp_colour}]{float(self.device_stats.target_temperature)}[/{target_temp_colour}][/bold] {temp_symbol}"  # noqa: E501
                 ),
-                Panel(
-                    Align.center(
-                        f"[bold][{target_temp_colour}]{float(self.device_stats.target_temperature)}[/{target_temp_colour}][/bold] {temp_symbol}"  # noqa: E501
-                    ),
-                    title="Target Temperature",
-                ),
-            ]
-            console.print(Columns(panels))
+                title="Target Temperature",
+            ),
+        ]
+        console.print(Columns(panels))
 
     def set_target_temperature(self, temperature: float):
-        self.get_device_stats(print=False)
+        self.get_device_stats(no_print=False)
 
         command_url = f"{self.SDM_API}/enterprises/{self.authenticator.project_id}/devices/{self.thermostat_id}:executeCommand"  # noqa: E501
 
