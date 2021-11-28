@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from py_nest_thermostat.auth import Authenticator
-from py_nest_thermostat.database import database_connector
+from py_nest_thermostat.connectors.postgres import database_connector
 from py_nest_thermostat.logger import log
 from py_nest_thermostat.models import DeviceStats
 
