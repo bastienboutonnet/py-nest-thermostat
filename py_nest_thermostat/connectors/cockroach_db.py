@@ -1,14 +1,15 @@
 import logging
+import os
 from contextlib import contextmanager
+from pathlib import Path
 
 import sqlalchemy.ext.declarative as dec
+from dotenv import load_dotenv
+from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
 from py_nest_thermostat.connectors.base import BaseDbConnector
-from pydantic import BaseModel
-from pathlib import Path
-from dotenv import load_dotenv
-import os
 
 SQLAlchemyBase = dec.declarative_base()
 

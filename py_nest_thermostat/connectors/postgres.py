@@ -2,11 +2,11 @@ import logging
 from contextlib import contextmanager
 
 import sqlalchemy.ext.declarative as dec
+from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from py_nest_thermostat.connectors.base import BaseDbConnector
-from pydantic import BaseModel
 
+from py_nest_thermostat.connectors.base import BaseDbConnector
 
 SQLAlchemyBase = dec.declarative_base()
 
