@@ -2,11 +2,12 @@ from cleo import Application, Command
 from rich.console import Console
 
 from py_nest_thermostat.auth import Authenticator
+from py_nest_thermostat.config import config
 from py_nest_thermostat.nest_api import NestThermostat
 
 console = Console()
 
-AUTHENTICATOR = Authenticator()
+AUTHENTICATOR = Authenticator(config)
 
 
 class ListDevicesCommand(Command):
@@ -17,7 +18,7 @@ class ListDevicesCommand(Command):
     """
 
     def handle(self):
-        thermostat = NestThermostat(AUTHENTICATOR)
+        thermostat = NestThermostat(AUTHENTICATOR, config=config)
         thermostat.get_devices()
 
 
@@ -31,7 +32,7 @@ class DevicesStatsCommand(Command):
     """
 
     def handle(self):
-        thermostat = NestThermostat(AUTHENTICATOR)
+        thermostat = NestThermostat(AUTHENTICATOR, config=config)
         thermostat.get_device_stats(
             no_print=self.option("no-print"), save_stats=self.option("save-to-db")  # type: ignore
         )
@@ -46,7 +47,7 @@ class SetTemperatureCommand(Command):
     """
 
     def handle(self):
-        thermostat = NestThermostat(AUTHENTICATOR)
+        thermostat = NestThermostat(AUTHENTICATOR, config=config)
         thermostat.set_target_temperature(self.argument("temperature"))  # type: ignore
 
 

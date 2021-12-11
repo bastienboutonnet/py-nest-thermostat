@@ -6,15 +6,12 @@ from typing import Any, Optional
 
 import httpx
 import questionary
-from dotenv import load_dotenv
 from rich.console import Console
 
+from py_nest_thermostat.config import PyNestConfig
 from py_nest_thermostat.logger import log
 
 console = Console()
-
-CREDENTIALS_FILE = Path("~/.py-nest-thermostat/credentials.env").expanduser()
-load_dotenv(CREDENTIALS_FILE)
 
 
 class AuthRequestError(Exception):
@@ -25,14 +22,8 @@ class Authenticator:
     TOKEN_URL = "https://www.googleapis.com/oauth2/v4/token"
     ACCESS_TOKEN_FILENAME = Path("~/.py-nest-thermostat/access_token.json").expanduser()
 
-    def __init__(self):
-        self.client_id: str = os.getenv("client_id", "")
-        self.client_secret: str = os.getenv("client_secret", "")
-        self.redirect_uri: str = os.getenv("redirect_uri", "")
-        self.project_id: str = os.getenv("project_id", "")
-        self.authorization_code: str = os.getenv("authorization_code", "")
-        self.refresh_token: Optional[str] = os.getenv("refresh_token")
-
+    def __init__(self, config: PyNestConfig):
+        self.config = config
         # this will be populated when we do get token
         self.access_token_json: Optional[dict[str, Any]] = None
         self.access_token: str
@@ -71,10 +62,14 @@ class Authenticator:
 
     def authenticate(self):
         # if we already have a refresh token we don't need to go through auth again.
-        if self.refresh_token:
+        if self.access_token_json:
+            self.refresh_token = self.access_token_json.get("refresh_token", "")
+            console.print("We have a access_token_json and we're gonna use it")
+            if self.access_token_json.get("refresh_token", ""):
+                console.print("We also have a refresh token in that json")
             refresh_token_params: dict[str, str] = {
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
+                "client_id": self.config.nest_auth.client_id,
+                "client_secret": self.config.nest_auth.client_secret,
                 "refresh_token": self.refresh_token,
                 "grant_type": "refresh_token",
             }
@@ -95,12 +90,15 @@ class Authenticator:
             # we first need to obtain an authorization_code via an interactive process
             authorization_code_url = (
                 f"https://nestservices.google.com/partnerconnections/"
-                f"{self.project_id}/auth?redirect_uri={self.redirect_uri}&access_type=offline&prompt=consent&client_id="
-                f"{self.client_id}&response_type=code&scope=https://www.googleapis.com/auth/sdm.service"
+                f"{self.config.nest_auth.project_id}/auth?redirect_uri={self.config.nest_auth.redirect_uri}&"
+                "access_type=offline&prompt=consent&client_id="
+                f"{self.config.nest_auth.client_id}&response_type=code&scope="
+                "https://www.googleapis.com/auth/sdm.service"
             )
             console.print(
                 f"Open the following URL in your browser: {authorization_code_url} \n"
-                f"Once you have authorised, you will be redirected to your redirect_uri: {self.redirect_uri}"
+                "Once you have authorised, you will be redirected to your redirect_uri: "
+                f"{self.config.nest_auth.redirect_uri}"
             )
             # TODO: Revisit this as it looks like passing the 4/ via the input changes the / and messes up the request.
             auth_code = questionary.password(
@@ -113,11 +111,11 @@ class Authenticator:
                 # we then use that code to make an auth and this will give us a token + a refresh one
                 log.debug("we're going to try first time auth flow")
                 token_request_params: dict[str, str] = {
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "code": f"4/{auth_code}",
+                    "client_id": self.config.nest_auth.client_id,
+                    "client_secret": self.config.nest_auth.client_secret,
+                    "code": f"{auth_code}",
                     "grant_type": "authorization_code",
-                    "redirect_uri": self.redirect_uri,
+                    "redirect_uri": self.config.nest_auth.redirect_uri,
                 }
                 token_response = httpx.post(self.TOKEN_URL, params=token_request_params)
                 if token_response.status_code == 200:
@@ -128,12 +126,6 @@ class Authenticator:
                         self.access_token_obtained_at = datetime.now()
                     self.refresh_token = self.token_response_json.get("refresh_token", "")
 
-                    if self.refresh_token is not None:
-                        with open(CREDENTIALS_FILE, "a") as f:
-                            # TODO: this is a bit dirty may we should rewrite so that
-                            # we check wether there is already an entry for "refresh_token" in the file
-                            # and in that case we probably want to nuke it first.
-                            f.write(f"refresh_token={self.refresh_token}")
                 else:
                     raise AuthRequestError(
                         f"Token request unsuccessful {token_response.status_code=}, {token_response.text=}"
@@ -141,11 +133,16 @@ class Authenticator:
             else:
                 raise AuthRequestError("You do not seem to have provided any authorization_code")
 
-                # cache the access code along with a timestamp of when we got it
-        if self.token_response_json:
-            self.access_token_obtained_at = datetime.now()
+        if self.token_response_json and self.refresh_token:
             with open(self.ACCESS_TOKEN_FILENAME, "w") as f:
                 self.token_response_json.update(
-                    {"access_token_obtained_at": self.access_token_obtained_at}
+                    {
+                        "refresh_token": self.refresh_token,
+                        "access_token_obtained_at": self.access_token_obtained_at,
+                    }
                 )
                 json.dump(self.token_response_json, f, default=str)
+        else:
+            raise AttributeError(
+                "I must have a refresh token otherwise I'm not going to save the token"
+            )

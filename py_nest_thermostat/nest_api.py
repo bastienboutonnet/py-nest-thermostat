@@ -12,11 +12,27 @@ from rich.console import Console
 from rich.panel import Panel
 
 from py_nest_thermostat.auth import Authenticator
-from py_nest_thermostat.database import database_connector
+from py_nest_thermostat.config import PyNestConfig
+from py_nest_thermostat.connectors.base import BaseDbConnector
+from py_nest_thermostat.connectors.cockroach_db import cockroach_connector
+from py_nest_thermostat.connectors.postgres import postgres_connector
 from py_nest_thermostat.logger import log
 from py_nest_thermostat.models import DeviceStats
 
 console = Console()
+
+
+class DatabaseFactory:
+    def __init__(self, config: PyNestConfig):
+        self.db_type = config.database.type
+
+    def get_connector(self) -> BaseDbConnector:
+        if self.db_type == "postgres":
+            return postgres_connector
+        elif self.db_type == "cockroach":
+            return cockroach_connector
+        else:
+            raise NotImplementedError(f"{self.db_type} is not a supported database type")
 
 
 class ParentRelation(BaseModel):
@@ -56,8 +72,9 @@ class NestThermostat:
     SUPPORTED_DEVICE_TYPES: set[str] = {"sdm.devices.types.THERMOSTAT"}
     SDM_API: str = "https://smartdevicemanagement.googleapis.com/v1"
 
-    def __init__(self, authenticator: Authenticator):
+    def __init__(self, authenticator: Authenticator, config: PyNestConfig):
         self.authenticator = authenticator
+        self.config = config
 
         # made available by methods
         self.device_list: Optional[DeviceList]
@@ -72,7 +89,7 @@ class NestThermostat:
         }
 
     def get_devices(self):
-        device_url = f"{self.BASE_NEST_API_URL}{self.authenticator.project_id}/devices"
+        device_url = f"{self.BASE_NEST_API_URL}{self.config.nest_auth.project_id}/devices"
 
         devices_response = httpx.get(device_url, headers=self.headers)
 
@@ -154,10 +171,11 @@ class NestThermostat:
                 mode=self.device_stats.mode,
                 target_temperature=self.device_stats.target_temperature,
             )
+            database_connector = DatabaseFactory(self.config).get_connector()
             database_connector.connect()
             database_connector.create_models()
-            with database_connector.session_manager() as session:
-                log.info("Saving thremostat stats to database")
+            with database_connector.session_manager() as session:  # type: ignore
+                log.info(f"Saving thremostat stats to database: {self.config.database.type}.")
                 session.add(device_stats)
                 session.commit()
         else:
@@ -209,7 +227,7 @@ class NestThermostat:
     def set_target_temperature(self, temperature: float):
         self.get_device_stats(no_print=False)
 
-        command_url = f"{self.SDM_API}/enterprises/{self.authenticator.project_id}/devices/{self.thermostat_id}:executeCommand"  # noqa: E501
+        command_url = f"{self.SDM_API}/enterprises/{self.config.nest_auth.project_id}/devices/{self.thermostat_id}:executeCommand"  # noqa: E501
 
         temperature = float(temperature)
         request_body = {
