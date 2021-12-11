@@ -21,7 +21,6 @@ class AuthRequestError(Exception):
 class Authenticator:
     TOKEN_URL = "https://www.googleapis.com/oauth2/v4/token"
     ACCESS_TOKEN_FILENAME = Path("~/.py-nest-thermostat/access_token.json").expanduser()
-    REFRESH_TOKEN_FILENAME = Path("~/.py-nest-thermostat/refresh_token.json").expanduser()
 
     def __init__(self, config: PyNestConfig):
         self.config = config
@@ -69,8 +68,8 @@ class Authenticator:
             if self.access_token_json.get("refresh_token", ""):
                 console.print("We also have a refresh token in that json")
             refresh_token_params: dict[str, str] = {
-                "client_id": self.config.client_id,
-                "client_secret": self.config.client_secret,
+                "client_id": self.config.nest_auth.client_id,
+                "client_secret": self.config.nest_auth.client_secret,
                 "refresh_token": self.refresh_token,
                 "grant_type": "refresh_token",
             }
@@ -91,13 +90,15 @@ class Authenticator:
             # we first need to obtain an authorization_code via an interactive process
             authorization_code_url = (
                 f"https://nestservices.google.com/partnerconnections/"
-                f"{self.config.project_id}/auth?redirect_uri={self.config.redirect_uri}&"
+                f"{self.config.nest_auth.project_id}/auth?redirect_uri={self.config.nest_auth.redirect_uri}&"
                 "access_type=offline&prompt=consent&client_id="
-                f"{self.config.client_id}&response_type=code&scope=https://www.googleapis.com/auth/sdm.service"
+                f"{self.config.nest_auth.client_id}&response_type=code&scope="
+                "https://www.googleapis.com/auth/sdm.service"
             )
             console.print(
                 f"Open the following URL in your browser: {authorization_code_url} \n"
-                f"Once you have authorised, you will be redirected to your redirect_uri: {self.config.redirect_uri}"
+                "Once you have authorised, you will be redirected to your redirect_uri: "
+                f"{self.config.nest_auth.redirect_uri}"
             )
             # TODO: Revisit this as it looks like passing the 4/ via the input changes the / and messes up the request.
             auth_code = questionary.password(
@@ -110,11 +111,11 @@ class Authenticator:
                 # we then use that code to make an auth and this will give us a token + a refresh one
                 log.debug("we're going to try first time auth flow")
                 token_request_params: dict[str, str] = {
-                    "client_id": self.config.client_id,
-                    "client_secret": self.config.client_secret,
+                    "client_id": self.config.nest_auth.client_id,
+                    "client_secret": self.config.nest_auth.client_secret,
                     "code": f"{auth_code}",
                     "grant_type": "authorization_code",
-                    "redirect_uri": self.config.redirect_uri,
+                    "redirect_uri": self.config.nest_auth.redirect_uri,
                 }
                 token_response = httpx.post(self.TOKEN_URL, params=token_request_params)
                 if token_response.status_code == 200:
