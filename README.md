@@ -58,7 +58,7 @@ pipx install py-nest-thermostat
 
 ## Create your credentials file
 
-`py-nest` expects your credentials and other handy authentication parameters to be in an file named `config.yaml` and it should be placed at this location `~/.py-nest-thermostat/`. We might implement the possibility to pass a custom location later. If you're too impatient feel free to help out! :)
+`nest` expects your credentials and other handy authentication parameters to be in an file named `config.yaml` and it should be placed at this location `~/.py-nest-thermostat/`. We might implement the possibility to pass a custom location later. If you're too impatient feel free to help out! :)
 
 You can find an example of this file [here](./config.yaml.sample)
 
@@ -73,5 +73,5 @@ If you prefer to use regular `pip`, follow those steps:
 Until I write some more extensive docs, once you have installed the tool use use the CLI `--help` command
 
 ```bash
-py-nest --help
+nest --help
 ```
