@@ -19,7 +19,6 @@ repository = "https://github.com/bastienboutonnet/py-nest-thermostat"
 [tool.poetry.dependencies]
 python = "^3.9"
 httpx = "^0.20.0"
-python-dotenv = "^0.19.1"
 questionary = "^1.10.0"
 cleo = "^0.8.1"
 pydantic = "^1.8.2"
