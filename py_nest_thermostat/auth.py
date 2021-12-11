@@ -64,9 +64,9 @@ class Authenticator:
         # if we already have a refresh token we don't need to go through auth again.
         if self.access_token_json:
             self.refresh_token = self.access_token_json.get("refresh_token", "")
-            console.print("We have a access_token_json and we're gonna use it")
+            log.debug("We have found an access token file")
             if self.access_token_json.get("refresh_token", ""):
-                console.print("We also have a refresh token in that json")
+                log.debug("A refresh token was found so we'll auth by requesting a new token")
             refresh_token_params: dict[str, str] = {
                 "client_id": self.config.nest_auth.client_id,
                 "client_secret": self.config.nest_auth.client_secret,
@@ -80,6 +80,7 @@ class Authenticator:
                     self.token_response_json = token_response.json()
                     if self.token_response_json:
                         self.access_token = self.token_response_json.get("access_token", "")
+                        self.access_token_obtained_at = datetime.now()
                 else:
                     raise AuthRequestError(
                         f"{token_response.status_code=}, {token_response.json()=}"

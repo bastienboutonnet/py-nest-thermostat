@@ -1,6 +1,7 @@
 from cleo import Application, Command
 from rich.console import Console
 
+from py_nest_thermostat import __version__
 from py_nest_thermostat.auth import Authenticator
 from py_nest_thermostat.config import config
 from py_nest_thermostat.nest_api import NestThermostat
@@ -51,7 +52,7 @@ class SetTemperatureCommand(Command):
         thermostat.set_target_temperature(self.argument("temperature"))  # type: ignore
 
 
-application = Application()
+application = Application(name="py-nest-thermostat", version=__version__)
 application.add(ListDevicesCommand())
 application.add(DevicesStatsCommand())
 application.add(SetTemperatureCommand())

@@ -25,6 +25,9 @@ search = "{current_version}"
 [[file]]
 src = "pyproject.toml"
 search = 'version = "{current_version}"'
+[[file]]
+src = "./py_nest_thermostat/__init__.py"
+search = '__version__ = "{current_version}"'
 # You can specify a list of commands to
 # run after the files have been patched
 # and before the git commit is made
