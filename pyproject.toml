@@ -27,6 +27,7 @@ rich = "^10.13.0"
 SQLAlchemy = "^1.4.27"
 psycopg2 = "^2.9.1"
 sqlalchemy-cockroachdb = "^1.4.2"
+pyaml = "^21.10.1"
 
 [tool.poetry.dev-dependencies]
 black = "^21.9b0"
@@ -39,4 +40,4 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-py-nest="py_nest_thermostat.main:application.run"
+nest="py_nest_thermostat.main:application.run"

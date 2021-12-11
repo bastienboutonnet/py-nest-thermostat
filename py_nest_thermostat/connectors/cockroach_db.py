@@ -1,40 +1,34 @@
 import logging
-import os
 from contextlib import contextmanager
 from pathlib import Path
 
-import sqlalchemy.ext.declarative as dec
-from dotenv import load_dotenv
 from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from py_nest_thermostat.connectors.base import BaseDbConnector
-
-SQLAlchemyBase = dec.declarative_base()
-
-DB_CREDENTIALS_FILE = Path("~/.py-nest-thermostat/cockroad_db.env").expanduser()
-load_dotenv(DB_CREDENTIALS_FILE)
+from py_nest_thermostat.config import PyNestConfig, config
+from py_nest_thermostat.connectors.base import BaseDbConnector, SQLAlchemyBase
 
 
 class CockroachDbConnectionParams(BaseModel):
-    password: str = os.getenv("password", "")
-    username: str = os.getenv("username", "")
-    port: str = os.getenv("port", "")
-    database: str = os.getenv("database", "")
-    host: str = os.getenv("host", "")
-    cluster_name: str = os.getenv("cluster_name", "")
+    password: str
+    username: str
+    port: str
+    database: str
+    host: str
+    cluster_name: str
     ssl_cert_path: Path = Path("~/.postgresql/root.crt").expanduser().resolve()
 
 
 class CockroachDatabaseConnector(BaseDbConnector):
-    def __init__(self, connection_params: CockroachDbConnectionParams):
+    def __init__(self, config: PyNestConfig):
+        self.connection_params = CockroachDbConnectionParams(**config.database.credentials)
         self.connection_url: str = (
-            f"cockroachdb://{connection_params.username}:"
-            f"{connection_params.password}@{connection_params.host}:"
-            f"{connection_params.port}/defaultdb?"
-            f"sslmode=verify-full&sslrootcert={connection_params.ssl_cert_path}&"
-            f"options=--cluster%3D{connection_params.cluster_name}"
+            f"cockroachdb://{self.connection_params.username}:"
+            f"{self.connection_params.password}@{self.connection_params.host}:"
+            f"{self.connection_params.port}/defaultdb?"
+            f"sslmode=verify-full&sslrootcert={self.connection_params.ssl_cert_path}&"
+            f"options=--cluster%3D{self.connection_params.cluster_name}"
         )
 
     def connect(self):
@@ -57,4 +51,8 @@ class CockroachDatabaseConnector(BaseDbConnector):
             session.rollback()
             raise e
         finally:
+            session.close()
             logging.debug("Closing database connection")
+
+
+cockroach_connector = CockroachDatabaseConnector(config)

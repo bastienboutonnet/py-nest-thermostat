@@ -1,5 +1,9 @@
 from abc import ABC
 
+import sqlalchemy.ext.declarative as dec
+
+SQLAlchemyBase = dec.declarative_base()
+
 
 class BaseDbConnector(ABC):
     """

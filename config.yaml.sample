@@ -1,0 +1,9 @@
+nest_auth:
+	client_id: <your client_id from the google oauth console: https://console.cloud.google.com/apis/credentials>
+	client_secret: <you client secret from the google oauth console: https://console.cloud.google.com/apis/credentials?project=nest-report>
+	project_id: <the project id you will have configured here: https://console.nest.google.com/device-access/project-list>
+	redirect_uri: <the url you chose when configuring your oauth redirect screen>
+
+database:
+	type: <postgres or cockroach are currently supported>
+	# the fields below are database connector dependent. Check pydantic models in the [py_nest_thermostat/connectors/](./py_nest_thermostat/connectors) files

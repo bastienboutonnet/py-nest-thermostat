@@ -1,14 +1,11 @@
 import logging
 from contextlib import contextmanager
 
-import sqlalchemy.ext.declarative as dec
 from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from py_nest_thermostat.connectors.base import BaseDbConnector
-
-SQLAlchemyBase = dec.declarative_base()
+from py_nest_thermostat.connectors.base import BaseDbConnector, SQLAlchemyBase
 
 
 class PostgresDbConnectionParams(BaseModel):
@@ -20,7 +17,7 @@ class PostgresDbConnectionParams(BaseModel):
 
 class PostgresDatabaseConnector(BaseDbConnector):
     def __init__(self, connection_params: PostgresDbConnectionParams):
-        self.connection_string = connection_params.db_name
+        self.connection_string = connection_params.db_url
 
     def connect(self):
         self.engine = create_engine(self.connection_string)
@@ -45,4 +42,4 @@ class PostgresDatabaseConnector(BaseDbConnector):
             logging.debug("Closing database connection")
 
 
-database_connector = PostgresDatabaseConnector(PostgresDbConnectionParams())
+postgres_connector = PostgresDatabaseConnector(PostgresDbConnectionParams())
