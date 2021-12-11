@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from py_nest_thermostat.config import PyNestConfig, config
 from py_nest_thermostat.connectors.base import BaseDbConnector, SQLAlchemyBase
 
 
@@ -12,12 +13,17 @@ class PostgresDbConnectionParams(BaseModel):
     db_name: str = "py-nest-thermostat-report"
     password: str = "magical_password"
     username: str = "py-nest-thermostat"
-    db_url: str = f"postgresql+psycopg2://{username}:{password}@localhost:5432/{db_name}"
 
 
 class PostgresDatabaseConnector(BaseDbConnector):
-    def __init__(self, connection_params: PostgresDbConnectionParams):
-        self.connection_string = connection_params.db_url
+    def __init__(self, config: PyNestConfig):
+        self.connection_params = PostgresDbConnectionParams(**config.database.credentials)
+
+        db_url: str = (
+            f"postgresql+psycopg2://{self.connection_params.username}:"
+            f"{self.connection_params.password}@localhost:5432/{self.connection_params.db_name}"
+        )
+        self.connection_string = db_url
 
     def connect(self):
         self.engine = create_engine(self.connection_string)
@@ -42,4 +48,4 @@ class PostgresDatabaseConnector(BaseDbConnector):
             logging.debug("Closing database connection")
 
 
-postgres_connector = PostgresDatabaseConnector(PostgresDbConnectionParams())
+postgres_connector = PostgresDatabaseConnector(config)
