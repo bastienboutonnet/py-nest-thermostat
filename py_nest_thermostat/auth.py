@@ -16,11 +16,17 @@ console = Console()
 
 
 class AccessToken(BaseModel):
-    access_token: str = ""
-    refresh_token: str = ""
+    access_token: str
+    refresh_token: str
     access_token_obtained_at: datetime = datetime.strptime(
         "1901-01-01 00:00:00.00", "%Y-%m-%d %H:%M:%S.%f"
     )
+    expires_in: int
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: Optional[str]
     expires_in: int
 
 
@@ -34,7 +40,7 @@ class Authenticator:
 
     def __init__(self, config: PyNestConfig):
         self.config = config
-        self.access_token_json = AccessToken()
+        self.access_token_json: AccessToken
 
         self.access_token_obtained_at: datetime = datetime.strptime(
             "1901-01-01 00:00:00.00", "%Y-%m-%d %H:%M:%S.%f"
@@ -49,7 +55,7 @@ class Authenticator:
                     token_file_dict = json.load(f)
                     self.access_token_json = AccessToken(**token_file_dict)
                 except json.JSONDecodeError as e:
-                    log.error(
+                    raise AuthRequestError(
                         f"There was an issue reading access_token.json so we'll have to re-authenticate. Error: {e}"
                     )
 
@@ -75,10 +81,13 @@ class Authenticator:
         if token_response.status_code == 200:
             self.token_response_json = token_response.json()
             if self.token_response_json:
-                self.access_token_json = AccessToken(**self.token_response_json)
-                self.access_token_json.access_token_obtained_at = datetime.utcnow()
-                if self.access_token_json.access_token:
-                    self.access_token_json.refresh_token = self.refresh_token
+                self.token_response_model = TokenResponse(**self.token_response_json)
+                self.access_token_json = AccessToken(
+                    access_token=self.token_response_model.access_token,
+                    refresh_token=self.refresh_token,
+                    access_token_obtained_at=datetime.utcnow(),
+                    expires_in=self.token_response_model.expires_in,
+                )
             else:
                 raise AuthRequestError(f"{token_response.status_code=}, {token_response.json()=}")
 
