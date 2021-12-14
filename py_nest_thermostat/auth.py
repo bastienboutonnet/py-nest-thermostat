@@ -6,12 +6,22 @@ from typing import Any, Optional
 
 import httpx
 import questionary
+from pydantic import BaseModel
 from rich.console import Console
 
 from py_nest_thermostat.config import PyNestConfig
 from py_nest_thermostat.logger import log
 
 console = Console()
+
+
+class AccessToken(BaseModel):
+    access_token: str = ""
+    refresh_token: str = ""
+    access_token_obtained_at: datetime = datetime.strptime(
+        "1901-01-01 00:00:00.00", "%Y-%m-%d %H:%M:%S.%f"
+    )
+    expires_in: int
 
 
 class AuthRequestError(Exception):
@@ -24,10 +34,11 @@ class Authenticator:
 
     def __init__(self, config: PyNestConfig):
         self.config = config
-        # this will be populated when we do get token
-        self.access_token_json: Optional[dict[str, Any]] = None
-        self.access_token: str
-        self.access_token_obtained_at: datetime
+        self.access_token_json = AccessToken()
+
+        self.access_token_obtained_at: datetime = datetime.strptime(
+            "1901-01-01 00:00:00.00", "%Y-%m-%d %H:%M:%S.%f"
+        )
         self.token_response_json: Optional[dict[str, Any]] = None
 
     def get_token(self):
@@ -35,38 +46,50 @@ class Authenticator:
         if os.path.isfile(self.ACCESS_TOKEN_FILENAME):
             with open(self.ACCESS_TOKEN_FILENAME) as f:
                 try:
-                    self.access_token_json = json.load(f)
+                    token_file_dict = json.load(f)
+                    self.access_token_json = AccessToken(**token_file_dict)
                 except json.JSONDecodeError as e:
                     log.error(
                         f"There was an issue reading access_token.json so we'll have to re-authenticate. Error: {e}"
                     )
-                    self.access_token_json = None
 
-        if self.access_token_json is not None:
-            last_accessed_at = self.access_token_json.get(
-                "access_token_obtained_at", "1901-01-01 00:00:00"
-            )
-            last_accessed_at = datetime.strptime(last_accessed_at, "%Y-%m-%d %H:%M:%S.%f")
-            expires_delta = self.access_token_json.get("expires_in", 0)
-            last_access_to_now_delta = datetime.now() - last_accessed_at
+        if self.access_token_json:
+            last_accessed_at = self.access_token_json.access_token_obtained_at
+            assert last_accessed_at, "last_accessed_at cannot be None"
+            # last_accessed_at = datetime.strptime(last_accessed_at, "%Y-%m-%d %H:%M:%S.%f")
+            expires_delta = self.access_token_json.expires_in
+            last_access_to_now_delta = datetime.utcnow() - last_accessed_at
 
             if last_access_to_now_delta.seconds > int(expires_delta) - 10:
                 log.debug("We need to refresh the token as it has expired.")
                 self.authenticate()
             else:
+                # TODO: Check how we can control the logger level via cleo
                 log.debug("No need to authenticate, auth code is still valid")
-                self.access_token = self.access_token_json.get("access_token", "")
+                # self.access_token = self.access_token_json.get("access_token", "")
         else:
             log.info("Authenticating")
             self.authenticate()
 
+    def verify_and_parse_token_response(self, token_response: httpx.Response):
+        if token_response.status_code == 200:
+            self.token_response_json = token_response.json()
+            if self.token_response_json:
+                self.access_token_json = AccessToken(**self.token_response_json)
+                self.access_token_json.access_token_obtained_at = datetime.utcnow()
+                if self.access_token_json.access_token:
+                    self.access_token_json.refresh_token = self.refresh_token
+            else:
+                raise AuthRequestError(f"{token_response.status_code=}, {token_response.json()=}")
+
     def authenticate(self):
         # if we already have a refresh token we don't need to go through auth again.
         if self.access_token_json:
-            self.refresh_token = self.access_token_json.get("refresh_token", "")
             log.debug("We have found an access token file")
-            if self.access_token_json.get("refresh_token", ""):
+            if self.access_token_json.refresh_token:
+                self.refresh_token = self.access_token_json.refresh_token
                 log.debug("A refresh token was found so we'll auth by requesting a new token")
+            # compose the request params
             refresh_token_params: dict[str, str] = {
                 "client_id": self.config.nest_auth.client_id,
                 "client_secret": self.config.nest_auth.client_secret,
@@ -75,17 +98,10 @@ class Authenticator:
             }
             try:
                 token_response = httpx.post(self.TOKEN_URL, params=refresh_token_params)
-                log.debug("Made refresh for token")
-                if token_response.status_code == 200:
-                    self.token_response_json = token_response.json()
-                    if self.token_response_json:
-                        self.access_token = self.token_response_json.get("access_token", "")
-                        self.access_token_obtained_at = datetime.now()
-                else:
-                    raise AuthRequestError(
-                        f"{token_response.status_code=}, {token_response.json()=}"
-                    )
+                log.debug("Token refresh request issued")
+                self.verify_and_parse_token_response(token_response)
             except httpx.RequestError as e:
+                # TODO: shouldn't we be raising here?
                 log.error(f"There was an issue while requesting tokens. {e}")
         else:
             # we first need to obtain an authorization_code via an interactive process
@@ -105,10 +121,10 @@ class Authenticator:
             auth_code = questionary.password(
                 message=(
                     "Paste the code contained between '?code=' and '&scope=' "
-                    "from the URL of the page that was loaded after you authorised the app."
+                    "from the URL of the page that was loaded after you authorised the app.\n"
                 )
             ).ask()
-            if auth_code is not None:
+            if auth_code:
                 # we then use that code to make an auth and this will give us a token + a refresh one
                 log.debug("we're going to try first time auth flow")
                 token_request_params: dict[str, str] = {
@@ -118,32 +134,22 @@ class Authenticator:
                     "grant_type": "authorization_code",
                     "redirect_uri": self.config.nest_auth.redirect_uri,
                 }
-                token_response = httpx.post(self.TOKEN_URL, params=token_request_params)
-                if token_response.status_code == 200:
-                    self.token_response_json = token_response.json()
-                    self.access_token = self.token_response_json.get("access_token", "")
-
-                    if self.access_token:
-                        self.access_token_obtained_at = datetime.now()
-                    self.refresh_token = self.token_response_json.get("refresh_token", "")
-
-                else:
-                    raise AuthRequestError(
-                        f"Token request unsuccessful {token_response.status_code=}, {token_response.text=}"
-                    )
+                try:
+                    token_response = httpx.post(self.TOKEN_URL, params=token_request_params)
+                    self.verify_and_parse_token_response(token_response)
+                except httpx.RequestError as e:
+                    # TODO: shouldn't we be raising here?
+                    log.error(f"There was an issue while requesting tokens. {e}")
             else:
                 raise AuthRequestError("You do not seem to have provided any authorization_code")
 
         if self.token_response_json and self.refresh_token:
             with open(self.ACCESS_TOKEN_FILENAME, "w") as f:
-                self.token_response_json.update(
-                    {
-                        "refresh_token": self.refresh_token,
-                        "access_token_obtained_at": self.access_token_obtained_at,
-                    }
-                )
-                json.dump(self.token_response_json, f, default=str)
+                if self.access_token_json:
+                    json.dump(self.access_token_json.dict(), f, default=str)
         else:
             raise AttributeError(
-                "I must have a refresh token otherwise I'm not going to save the token"
+                "The token request does not seem to have returned a refresh token. "
+                "A refresh token is necessary to persist your credentials"
+                "Try to authenticate again and see if the problem persists."
             )

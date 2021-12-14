@@ -85,7 +85,7 @@ class NestThermostat:
         self.authenticator.get_token()
         self.headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.authenticator.access_token}",
+            "Authorization": f"Bearer {self.authenticator.access_token_json.access_token}",
         }
 
     def get_devices(self):
