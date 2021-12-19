@@ -33,6 +33,7 @@ black = "^21.9b0"
 pytest = "^6.2.5"
 ipython = "^7.29.0"
 pre-commit = "^2.15.0"
+towncrier = "^21.3.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -40,3 +41,32 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 nest="py_nest_thermostat.main:application.run"
+
+[tool.towncrier]
+package = "py_nest_thermostat"
+package_dir = "py_nest_thermostat/"
+filename = "CHANGELOG.md"
+directory = "changelog/"
+start_string = "# Changelog\n"
+issue_format = "[#{issue}](https://github.com/bastienboutonnet/py-nest-thermostat/issues/{issue})"
+underlines = ["", ""]
+template = "changelog/.towncrier.template.md"
+title_format = "## py-nest-thermostat [{version}] - {project_date}"
+
+
+
+    [[tool.towncrier.type]]
+    directory = "fix"
+    name = "Bug Fixes"
+    showcontent = true
+
+
+    [[tool.towncrier.type]]
+    directory = "feature"
+    name = "Features"
+    showcontent = true
+
+    [[tool.towncrier.type]]
+    directory = "misc"
+    name = "Under The Hood/Misc"
+    showcontent = true
