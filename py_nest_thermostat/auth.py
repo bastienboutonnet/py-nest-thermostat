@@ -62,7 +62,6 @@ class Authenticator:
         if self.access_token_json:
             last_accessed_at = self.access_token_json.access_token_obtained_at
             assert last_accessed_at, "last_accessed_at cannot be None"
-            # last_accessed_at = datetime.strptime(last_accessed_at, "%Y-%m-%d %H:%M:%S.%f")
             expires_delta = self.access_token_json.expires_in
             last_access_to_now_delta = datetime.utcnow() - last_accessed_at
 
@@ -70,9 +69,7 @@ class Authenticator:
                 log.debug("We need to refresh the token as it has expired.")
                 self.authenticate()
             else:
-                # TODO: Check how we can control the logger level via cleo
                 log.debug("No need to authenticate, auth code is still valid")
-                # self.access_token = self.access_token_json.get("access_token", "")
         else:
             log.info("Authenticating")
             self.authenticate()
