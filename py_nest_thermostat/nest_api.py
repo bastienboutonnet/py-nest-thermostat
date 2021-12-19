@@ -83,6 +83,9 @@ class NestThermostat:
         self.thermostat_display_name: Optional[str]
 
         self.authenticator.get_token()
+        assert (
+            self.authenticator.access_token_json
+        ), "The access token json was not correctly accessed"
         self.headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.authenticator.access_token_json.access_token}",

@@ -40,7 +40,7 @@ class Authenticator:
 
     def __init__(self, config: PyNestConfig):
         self.config = config
-        self.access_token_json: AccessToken
+        self.access_token_json: Optional[AccessToken] = None
 
         self.access_token_obtained_at: datetime = datetime.strptime(
             "1901-01-01 00:00:00.00", "%Y-%m-%d %H:%M:%S.%f"
@@ -82,6 +82,8 @@ class Authenticator:
             self.token_response_json = token_response.json()
             if self.token_response_json:
                 self.token_response_model = TokenResponse(**self.token_response_json)
+                if self.token_response_model.refresh_token:
+                    self.refresh_token = self.token_response_model.refresh_token
                 self.access_token_json = AccessToken(
                     access_token=self.token_response_model.access_token,
                     refresh_token=self.refresh_token,
