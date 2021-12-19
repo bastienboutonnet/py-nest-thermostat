@@ -1,4 +1,4 @@
-Version: `v0.0.3-a0`
+Version: `v0.0.3`
 
 # py-nest-thermostat
 
