@@ -2,9 +2,12 @@ import json
 import re
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional, Sequence
 
 import httpx
+import pandas as pd
+import plotly.express as px
 from pydantic import BaseModel
 from rich.align import Align
 from rich.columns import Columns
@@ -71,6 +74,7 @@ class NestThermostat:
     BASE_NEST_API_URL: str = "https://smartdevicemanagement.googleapis.com/v1/enterprises/"
     SUPPORTED_DEVICE_TYPES: set[str] = {"sdm.devices.types.THERMOSTAT"}
     SDM_API: str = "https://smartdevicemanagement.googleapis.com/v1"
+    DATETIME_PATTERN: str = "%Y-%m-%d %H:%M:%S.%f"
 
     def __init__(self, authenticator: Authenticator, config: PyNestConfig):
         self.authenticator = authenticator
@@ -247,3 +251,53 @@ class NestThermostat:
             console.print(f"{self.thermostat_display_name} successfully set to '{temperature}'")
         else:
             httpx.RequestError(f"Request failed: {response.status_code=}, {response.text=}")
+
+    def get_historicals(self, start_date: datetime, end_date: datetime) -> pd.DataFrame:
+        """Note, the start and end date querying is inclusive both ways"""
+        # NOTE: this method needs to be ran in a method that calls .get_devices
+        database_connector = DatabaseFactory(self.config).get_connector()
+        database_connector.connect()
+        database_connector.create_models()
+        with database_connector.session_manager() as session:  # type: ignore
+            historical_stats = (
+                session.query(
+                    DeviceStats.recorded_at,
+                    DeviceStats.humidity,
+                    DeviceStats.temperature,
+                    DeviceStats.target_temperature,
+                )
+                .filter(
+                    DeviceStats.name == self.thermostat_display_name,
+                    DeviceStats.recorded_at >= start_date,
+                    DeviceStats.recorded_at <= end_date,
+                )
+                .order_by(DeviceStats.recorded_at)
+            )
+            df = pd.DataFrame.from_records(
+                historical_stats.all(),
+                columns=[col["name"] for col in historical_stats.column_descriptions],
+            )
+            return df
+
+    def download_historicals(self, start_date: datetime, end_date: datetime, save_path: Path):
+        self.get_devices()
+        filename = save_path / f"nest_stats_{start_date}_{end_date}"
+        historical_df = self.get_historicals(start_date, end_date)
+        historical_df.to_csv(f"{filename.resolve()}.csv", index=False)
+
+    def plot_historicals(self, start_date: datetime, end_date: datetime):
+        self.get_devices()
+        df = self.get_historicals(start_date, end_date)
+        df = df.melt(
+            id_vars="recorded_at",
+            value_vars=["humidity", "temperature", "target_temperature"],
+            var_name="measurement",
+        )
+        line_plot = px.line(
+            df.loc[df["measurement"].isin(["humidity"])],  # type: ignore
+            x="recorded_at",
+            y="value",
+            color="measurement",
+            symbol="measurement",
+        )
+        line_plot.show()
