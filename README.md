@@ -4,6 +4,8 @@ Version: `v0.0.3`
 
 Python CLI Nest Controller and Reporting Tool.
 
+**Build it with me on Twitch: https://www.twitch.tv/datafrittata**
+
 **Disclaimer:**
 This project is very much work in progress while in version 0 anything can change, anything can break and some parts of the code are probably very ugly. Feel free to test it, contribute (see [CONTRIBUTING.md]()), report bugs
 
