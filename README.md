@@ -11,11 +11,11 @@ This project is very much work in progress while in version 0 anything can chang
 
 **Get device stats:**
 
-![py nest stats](https://p56.f1.n0.cdn.getcloudapp.com/items/E0uKZLBb/dd63f9ff-a65e-4a95-9067-bc4c6f09d77a.gif?source=viewer&v=3e9c6a77683dd232609d610395417e58)
+![py nest stats](https://p20.f4.n0.cdn.getcloudapp.com/items/04uLgQmW/7f9ac5f0-cd31-4168-a681-efa311ae149b.gif?source=viewer&v=9e16a3d3f159925ea81c1be805a2144e)
 
 **Set Device Temperature:**
 
-![py nest set temp](https://p56.f1.n0.cdn.getcloudapp.com/items/E0uKZLBZ/ca47db6b-3d8c-479c-b350-a0fdfd7416b1.gif?source=viewer&v=898e9184fbb67ee4471646039837bae8)
+![py nest set temp](https://p20.f4.n0.cdn.getcloudapp.com/items/JruG7ok0/7527e6c4-ba14-4447-8345-8dfa9a1bb32c.gif?source=viewer&v=09fb7a9c4370d84d69cd25535d714b49)
 
 ## Features:
 
