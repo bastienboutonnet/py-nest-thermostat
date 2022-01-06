@@ -10,9 +10,11 @@ Python CLI Nest Controller and Reporting Tool.
 This project is very much work in progress while in version 0 anything can change, anything can break and some parts of the code are probably very ugly. Feel free to test it, contribute (see [CONTRIBUTING.md]()), report bugs
 
 **Get device stats:**
+
 ![py nest stats](https://p56.f1.n0.cdn.getcloudapp.com/items/E0uKZLBb/dd63f9ff-a65e-4a95-9067-bc4c6f09d77a.gif?source=viewer&v=3e9c6a77683dd232609d610395417e58)
 
 **Set Device Temperature:**
+
 ![py nest set temp](https://p56.f1.n0.cdn.getcloudapp.com/items/E0uKZLBZ/ca47db6b-3d8c-479c-b350-a0fdfd7416b1.gif?source=viewer&v=898e9184fbb67ee4471646039837bae8)
 
 ## Features:
