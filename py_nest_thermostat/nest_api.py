@@ -21,6 +21,12 @@ from py_nest_thermostat.models import DeviceStats
 
 console = Console()
 
+TEAL = "#6CA6DE"
+RED = "#FF6978"
+GREEN = "#80EBA6"
+YELLOW = "#D4B57C"
+PURPLE = "#B179CC"
+
 
 class DatabaseFactory:
     def __init__(self, config: PyNestConfig):
@@ -92,7 +98,7 @@ class NestThermostat:
             "Authorization": f"Bearer {self.authenticator.access_token_json.access_token}",
         }
 
-    def get_devices(self):
+    def get_devices(self, print_controlled_device_name: bool = True):
         device_url = f"{self.BASE_NEST_API_URL}{self.config.nest_auth.project_id}/devices"
 
         devices_response = httpx.get(device_url, headers=self.headers)
@@ -109,9 +115,11 @@ class NestThermostat:
                 self.thermostat_display_name = (
                     self.device_list.devices[0].parentRelations[0].displayName
                 )
-                console.print(
-                    f"You're currently controlling the '{self.thermostat_display_name}' thermostat."
-                )
+                if print_controlled_device_name:
+                    console.print(
+                        f"You're currently controlling the [{YELLOW}]{self.thermostat_display_name}[/{YELLOW}] "
+                        "thermostat."
+                    )
             else:
                 log.error(
                     f"Unsupported Device Type: {self.device_type}. Supported types: {self.SUPPORTED_DEVICE_TYPES}"
@@ -121,9 +129,14 @@ class NestThermostat:
                 f"Request failed: {devices_response.status_code=}, {devices_response.text=}"
             )
 
-    def get_device_stats(self, no_print: bool = False, save_stats: bool = False):
+    def get_device_stats(
+        self,
+        no_print: bool = False,
+        save_stats: bool = False,
+        print_controlled_device_name: bool = True,
+    ):
         # TODO: think about replacing the key access by gets when there is a chance that the attribute it not present.
-        self.get_devices()
+        self.get_devices(print_controlled_device_name)
         assert self.device_list, "device_list cannot be None"
         self.active_device: Optional[Device] = self.device_list.devices[0]
         assert self.active_device, "Could not find any devices"
@@ -206,64 +219,60 @@ class NestThermostat:
             )
 
     def print_device_stats(self):
-        teal = "#6CA6DE"
-        red = "#FF6978"
-        green = "#80EBA6"
-        yellow = "#D4B57C"
-        purple = "#B179CC"
         temp_colour = (
-            teal
+            TEAL
             if float(self.device_stats.temperature) < float(self.device_stats.target_temperature)
-            else teal
+            else TEAL
         )
         target_temp_colour = (
-            red
+            RED
             if float(self.device_stats.target_temperature) > float(self.device_stats.temperature)
-            else teal
+            else TEAL
         )
-        mode_colour = red if self.device_stats.mode == "HEAT" else teal
-        eco_mode_colour = green if self.device_stats.eco_mode != "OFF" else yellow
+        mode_colour = RED if self.device_stats.mode == "HEAT" else TEAL
+        eco_mode_colour = GREEN if self.device_stats.eco_mode != "OFF" else YELLOW
         temp_symbol = "°C" if self.device_stats.temperature_unit.lower() == "celsius" else "°F"
         panels = [
             Panel(
                 Align.center(
                     f"[bold][{temp_colour}]{self.device_stats.temperature}[/{temp_colour}][/bold] {temp_symbol}"
                 ),
-                title=f"[{purple}]Temperature",
+                title=f"[{PURPLE}]Temperature",
             ),
             Panel(
-                Align.center(f"[bold][{teal}]{self.device_stats.humidity}[/{teal}][/bold] %"),
-                title=f"[{purple}]Humidity",
+                Align.center(f"[bold][{TEAL}]{self.device_stats.humidity}[/{TEAL}][/bold] %"),
+                title=f"[{PURPLE}]Humidity",
             ),
             Panel(
                 Align.center(
                     f"[bold][{mode_colour}]{self.device_stats.mode}[/{mode_colour}][/bold]"
                 ),
-                title=f"[{purple}]Mode",
+                title=f"[{PURPLE}]Mode",
             ),
             Panel(
                 Align.center(
                     f"[bold][{eco_mode_colour}]{self.device_stats.eco_mode}[/{eco_mode_colour}][/bold]"
                 ),
-                title=f"[{purple}]Eco Mode",
+                title=f"[{PURPLE}]Eco Mode",
             ),
             Panel(
                 Align.center(
                     f"[bold][{target_temp_colour}]{float(self.device_stats.target_temperature)}[/{target_temp_colour}][/bold] {temp_symbol}"  # noqa: E501
                 ),
-                title=f"[{purple}]Target Temperature",
+                title=f"[{PURPLE}]Target Temperature",
             ),
         ]
         console.print(Columns(panels))
 
     def set_target_temperature(self, temperature: float):
-        self.get_device_stats(no_print=False)
+        self.get_devices()
 
         command_url = f"{self.SDM_API}/enterprises/{self.config.nest_auth.project_id}/devices/{self.thermostat_id}:executeCommand"  # noqa: E501
 
         temperature = float(temperature)
         request_body = {
             "command": "sdm.devices.commands.ThermostatTemperatureSetpoint.SetHeat",
+            # TODO/FIXME: would `heatCelsius` field work if the devise is in F?
             "params": {"heatCelsius": temperature},
         }
         response = httpx.post(
@@ -273,6 +282,11 @@ class NestThermostat:
         )
 
         if response.status_code == 200:
-            console.print(f"{self.thermostat_display_name} successfully set to '{temperature}'")
+            console.print(
+                f"{self.thermostat_display_name} successfully set to [bold][{GREEN}]{temperature}[/{GREEN}][/bold]"
+            )
         else:
             httpx.RequestError(f"Request failed: {response.status_code=}, {response.text=}")
+
+        # display info pannel after success
+        self.get_device_stats(no_print=False, print_controlled_device_name=False)
