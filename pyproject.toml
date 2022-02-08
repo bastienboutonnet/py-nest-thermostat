@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "py-nest-thermostat"
-version = "0.0.4"
+version = "0.0.5"
 description = "A Python CLI Nest Thermostat controller and dashborading tool"
 authors = ["Bastien Boutonnet <bastien.b1@gmail.com>"]
 license = "MIT"
