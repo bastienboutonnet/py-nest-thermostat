@@ -206,10 +206,11 @@ class NestThermostat:
             )
 
     def print_device_stats(self):
-        teal = "#A8F9FF"
+        teal = "#6CA6DE"
         red = "#FF6978"
         green = "#80EBA6"
         yellow = "#D4B57C"
+        purple = "#B179CC"
         temp_colour = (
             teal
             if float(self.device_stats.temperature) < float(self.device_stats.target_temperature)
@@ -228,29 +229,29 @@ class NestThermostat:
                 Align.center(
                     f"[bold][{temp_colour}]{self.device_stats.temperature}[/{temp_colour}][/bold] {temp_symbol}"
                 ),
-                title="Temperature",
+                title=f"[{purple}]Temperature",
             ),
             Panel(
                 Align.center(f"[bold][{teal}]{self.device_stats.humidity}[/{teal}][/bold] %"),
-                title="Humidity",
+                title=f"[{purple}]Humidity",
             ),
             Panel(
                 Align.center(
                     f"[bold][{mode_colour}]{self.device_stats.mode}[/{mode_colour}][/bold]"
                 ),
-                title="Mode",
+                title=f"[{purple}]Mode",
             ),
             Panel(
                 Align.center(
                     f"[bold][{eco_mode_colour}]{self.device_stats.eco_mode}[/{eco_mode_colour}][/bold]"
                 ),
-                title="Eco Mode",
+                title=f"[{purple}]Eco Mode",
             ),
             Panel(
                 Align.center(
                     f"[bold][{target_temp_colour}]{float(self.device_stats.target_temperature)}[/{target_temp_colour}][/bold] {temp_symbol}"  # noqa: E501
                 ),
-                title="Target Temperature",
+                title=f"[{purple}]Target Temperature",
             ),
         ]
         console.print(Columns(panels))
