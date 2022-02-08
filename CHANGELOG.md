@@ -1,3 +1,15 @@
+## py-nest-thermostat [0.0.4] - 2022-02-08
+
+### Bug Fixes
+
+- [#19](https://github.com/bastienboutonnet/py-nest-thermostat/issues/19) Fixes potential `KeyError`s on accessing properties of device traits that don't exist.
+
+### Features
+
+- [#19](https://github.com/bastienboutonnet/py-nest-thermostat/issues/19) Adds display of eco mode, and uses target temperature of eco mode in case eco mode is on instead of the regular target temperature.
+
+- [#20](https://github.com/bastienboutonnet/py-nest-thermostat/issues/20) User Atom One Dark Pro theme colours because, we like to use pretty tools!
+
 ## py-nest-thermostat [0.0.3] - 2021-12-19
 
 ### Features
