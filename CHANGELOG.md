@@ -1,3 +1,9 @@
+## py-nest-thermostat [0.0.5] - 2022-02-08
+
+### Bug Fixes
+
+- [#22](https://github.com/bastienboutonnet/py-nest-thermostat/issues/22) Device stats cards show **after** temperature update when using `nest temp <temperature>` instead of before to reflect the change more accurately and more pleasingly.
+
 ## py-nest-thermostat [0.0.4] - 2022-02-08
 
 ### Bug Fixes
