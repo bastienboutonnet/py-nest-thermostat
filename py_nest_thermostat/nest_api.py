@@ -64,6 +64,7 @@ class ThermostatStats(BaseModel):
     temperature_unit: str
     mode: str
     target_temperature: str
+    eco_mode: str
 
 
 class NestThermostat:
@@ -125,36 +126,54 @@ class NestThermostat:
         self.get_devices()
         assert self.device_list, "device_list cannot be None"
         self.active_device: Optional[Device] = self.device_list.devices[0]
+        assert self.active_device, "Could not find any devices"
 
         # we need to get the unit because it will help us use approproate scale specific keys
-        temperature_unit = self.active_device.traits["sdm.devices.traits.Settings"][
-            "temperatureScale"
-        ]
+        temperature_unit = self.active_device.traits.get("sdm.devices.traits.Settings", {}).get(
+            "temperatureScale", "no scale retrieved"
+        )
         temperature_unit = temperature_unit.title()
+        is_in_eco_mode = self.active_device.traits.get("sdm.devices.traits.ThermostatEco", {}).get(
+            "mode", False
+        )
+
+        # perform some eco mode related remappings
+        if is_in_eco_mode == "MANUAL_ECO":
+            target_temperature = self.active_device.traits.get(
+                "sdm.devices.traits.ThermostatEco", {}
+            ).get(f"heat{temperature_unit}", 0)
+        else:
+            target_temperature = self.active_device.traits.get(
+                "sdm.devices.traits.ThermostatTemperatureSetpoint", {}
+            ).get(f"heat{temperature_unit}", 0)
+
+        # build device stats object
         self.device_stats = ThermostatStats(
             device_id=self.active_device.name,
             device_name=self.active_device.parentRelations[0].displayName,
-            status=self.active_device.traits["sdm.devices.traits.Connectivity"]["status"],
+            status=self.active_device.traits.get("sdm.devices.traits.Connectivity", {}).get(
+                "status"
+            ),
             humidity=round(
                 float(
-                    self.active_device.traits["sdm.devices.traits.Humidity"][
-                        "ambientHumidityPercent"
-                    ],
+                    self.active_device.traits.get("sdm.devices.traits.Humidity", {}).get(
+                        "ambientHumidityPercent", 0
+                    ),
                 ),
             ),
             temperature=round(
-                self.active_device.traits["sdm.devices.traits.Temperature"][
-                    f"ambientTemperature{temperature_unit}"
-                ],
+                self.active_device.traits.get("sdm.devices.traits.Temperature", {}).get(
+                    f"ambientTemperature{temperature_unit}", 0
+                ),
                 1,
             ),
             temperature_unit=temperature_unit,
-            mode=self.active_device.traits["sdm.devices.traits.ThermostatMode"]["mode"],
-            target_temperature=round(
-                self.active_device.traits["sdm.devices.traits.ThermostatTemperatureSetpoint"][
-                    f"heat{temperature_unit}"
-                ],
-                1,
+            mode=self.active_device.traits.get("sdm.devices.traits.ThermostatMode", {}).get(
+                "mode", "NA"
+            ),
+            target_temperature=round(target_temperature, 1),
+            eco_mode=self.active_device.traits.get("sdm.devices.traits.ThermostatEco", {}).get(
+                "mode", "no eco mode info found"
             ),
         )
         if not no_print:
@@ -189,6 +208,8 @@ class NestThermostat:
     def print_device_stats(self):
         teal = "#A8F9FF"
         red = "#FF6978"
+        green = "#80EBA6"
+        yellow = "#D4B57C"
         temp_colour = (
             teal
             if float(self.device_stats.temperature) < float(self.device_stats.target_temperature)
@@ -200,6 +221,7 @@ class NestThermostat:
             else teal
         )
         mode_colour = red if self.device_stats.mode == "HEAT" else teal
+        eco_mode_colour = green if self.device_stats.eco_mode != "OFF" else yellow
         temp_symbol = "°C" if self.device_stats.temperature_unit.lower() == "celsius" else "°F"
         panels = [
             Panel(
@@ -217,6 +239,12 @@ class NestThermostat:
                     f"[bold][{mode_colour}]{self.device_stats.mode}[/{mode_colour}][/bold]"
                 ),
                 title="Mode",
+            ),
+            Panel(
+                Align.center(
+                    f"[bold][{eco_mode_colour}]{self.device_stats.eco_mode}[/{eco_mode_colour}][/bold]"
+                ),
+                title="Eco Mode",
             ),
             Panel(
                 Align.center(
