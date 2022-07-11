@@ -2,7 +2,8 @@ import json
 import re
 import uuid
 from datetime import datetime
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import httpx
 from pydantic import BaseModel
