@@ -24,7 +24,6 @@ cleo = "^0.8.1"
 pydantic = "^1.8.2"
 rich = "^10.13.0"
 SQLAlchemy = "^1.4.27"
-psycopg2 = "^2.9.1"
 sqlalchemy-cockroachdb = "^1.4.2"
 pyaml = "^21.10.1"
 
