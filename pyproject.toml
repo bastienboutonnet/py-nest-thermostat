@@ -26,6 +26,7 @@ rich = "^10.13.0"
 SQLAlchemy = "^1.4.27"
 sqlalchemy-cockroachdb = "^1.4.2"
 pyaml = "^21.10.1"
+psycopg2-binary = "^2.9.1"
 
 [tool.poetry.dev-dependencies]
 black = "^21.9b0"
